@@ -1,0 +1,208 @@
+From 1f512da81a71287b13eb0a1f9b31830b16db2107 Mon Sep 17 00:00:00 2001
+From: Daiki Ueno <ueno@gnu.org>
+Date: Tue, 17 Feb 2015 14:47:17 +0900
+Subject: [PATCH] template: Try all possible okuri-gana combinations
+
+Reported by ricky@burg.in.
+---
+ libkkc/state.vala                      | 29 +++++++++++++++++++++--------
+ libkkc/template.vala                   | 22 +++++++++-------------
+ tests/conversions-segment.json         | 14 +++++++-------
+ tests/conversions-user-dictionary.json |  6 +++---
+ tests/template.vala                    |  2 +-
+ 5 files changed, 41 insertions(+), 32 deletions(-)
+
+Index: libkkc-0.3.1/libkkc/state.vala
+===================================================================
+--- libkkc-0.3.1.orig/libkkc/state.vala
++++ libkkc-0.3.1/libkkc/state.vala
+@@ -292,11 +292,14 @@ namespace Kkc {
+                                                 out _candidates)) {
+                 return template.expand (_candidates[0].text);
+             }
+-            template = new OkuriganaTemplate (input);
+-            if (segment_dict.lookup_candidates (template.source,
+-                                                template.okuri,
+-                                                out _candidates)) {
+-                return template.expand (_candidates[0].text);
++            var count = input.char_count ();
++            if (count > 1) {
++                template = new OkuriganaTemplate (input, count - 1);
++                if (segment_dict.lookup_candidates (template.source,
++                                                    template.okuri,
++                                                    out _candidates)) {
++                    return template.expand (_candidates[0].text);
++                }
+             }
+             return null;
+         }
+@@ -353,7 +356,10 @@ namespace Kkc {
+             // 1. look for user segment dictionaries.
+             lookup_template (new NumericTemplate (normalized_input), true);
+             lookup_template (new SimpleTemplate (normalized_input), true);
+-            lookup_template (new OkuriganaTemplate (normalized_input), true);
++            for (var i = normalized_input.char_count (); i > 1; i--) {
++                lookup_template (
++                    new OkuriganaTemplate (normalized_input, i - 1), true);
++            }
+ 
+             // 2. search for Katakana candidate in unigrams in language model.
+             if (normalized_input.char_count () > 1) {
+@@ -373,7 +379,6 @@ namespace Kkc {
+             // 3. look for system segment dictionaries.
+             lookup_template (new NumericTemplate (normalized_input), false);
+             lookup_template (new SimpleTemplate (normalized_input), false);
+-            lookup_template (new OkuriganaTemplate (normalized_input), false);
+ 
+             // Prepare Kana candidates to check dupes when adding
+             // sentence candidates.
+@@ -412,9 +417,17 @@ namespace Kkc {
+                     builder.str);
+                 if (!kana_candidates.contains (sentence))
+                     candidates.add (sentence);
++
++            }
++
++            // 4.3. Look up okuri-ari candidates from system segment
++            // dictionaries, for each possible okurigana combination.
++            for (var i = normalized_input.char_count (); i > 1; i--) {
++                lookup_template (
++                    new OkuriganaTemplate (normalized_input, i - 1), false);
+             }
+ 
+-            // Add Kana candidates at the end.
++            // 4.4. Add Kana candidates at the end.
+             candidates.add_all (kana_candidates);
+ 
+             candidates.populated ();
+Index: libkkc-0.3.1/libkkc/template.vala
+===================================================================
+--- libkkc-0.3.1.orig/libkkc/template.vala
++++ libkkc-0.3.1/libkkc/template.vala
+@@ -42,19 +42,15 @@ namespace Kkc {
+ 
+         string? okurigana = null;
+ 
+-        public OkuriganaTemplate (string source) {
+-            var count = source.char_count ();
+-            if (count > 1) {
+-                var last_char_index = source.index_of_nth_char (count - 1);
+-                this.okurigana = source[last_char_index:source.length];
+-                string? prefix = RomKanaUtils.get_okurigana_prefix (
+-                    this.okurigana);
+-                this.source = source[0:last_char_index] + prefix;
+-                this.okuri = true;
+-            } else {
+-                this.source = source;
+-                this.okuri = false;
+-            }
++        public OkuriganaTemplate (string source, int pos) {
++            assert (source.char_count () > 1);
++            assert (0 < pos && pos < source.char_count ());
++
++            var last_char_index = source.index_of_nth_char (pos);
++            this.okurigana = source[last_char_index:source.length];
++            string? prefix = RomKanaUtils.get_okurigana_prefix (this.okurigana);
++            this.source = source[0:last_char_index] + prefix;
++            this.okuri = true;
+         }
+ 
+         public string expand (string text) {
+Index: libkkc-0.3.1/tests/conversions-segment.json
+===================================================================
+--- libkkc-0.3.1.orig/tests/conversions-segment.json
++++ libkkc-0.3.1/tests/conversions-segment.json
+@@ -122,11 +122,11 @@
+     {
+         "keys": "w a t a s h i n o n a m a e h a n a k a n o d e s u SPC SPC",
+         "input": "わたしのなまえはなかのです",
+-        "segments": "わたしの名前は中野です",
++        "segments": "渡しの名前は中野です",
+         "segments_size": 3,
+         "segments_cursor_pos": 0,
+         "output": "",
+-        "candidates_size": 4,
++        "candidates_size": 5,
+         "input_cursor_pos": -1
+     },
+     {
+@@ -136,7 +136,7 @@
+         "segments_size": 3,
+         "segments_cursor_pos": 0,
+         "output": "",
+-        "candidates_size": 4,
++        "candidates_size": 5,
+         "input_cursor_pos": -1
+     },
+     {
+@@ -152,17 +152,17 @@
+     {
+         "keys": "w a t a s h i n o n a m a e h a n a k a n o d e s u SPC SPC Right",
+         "input": "わたしのなまえはなかのです",
+-        "segments": "わたしの名前は中野です",
++        "segments": "渡しの名前は中野です",
+         "segments_size": 3,
+         "segments_cursor_pos": 1,
+         "output": "",
+-        "candidates_size": 4,
++        "candidates_size": 5,
+         "input_cursor_pos": -1
+     },
+     {
+         "keys": "w a t a s h i n o n a m a e h a n a k a n o d e s u SPC SPC Right SPC",
+         "input": "わたしのなまえはなかのです",
+-        "segments": "わたしのなまえは中野です",
++        "segments": "渡しのなまえは中野です",
+         "segments_size": 3,
+         "segments_cursor_pos": 1,
+         "output": "",
+@@ -172,7 +172,7 @@
+     {
+         "keys": "w a t a s h i n o n a m a e h a n a k a n o d e s u SPC SPC Right SPC SPC",
+         "input": "わたしのなまえはなかのです",
+-        "segments": "わたしのナマエハ中野です",
++        "segments": "渡しのナマエハ中野です",
+         "segments_size": 3,
+         "segments_cursor_pos": 1,
+         "output": "",
+Index: libkkc-0.3.1/tests/conversions-user-dictionary.json
+===================================================================
+--- libkkc-0.3.1.orig/tests/conversions-user-dictionary.json
++++ libkkc-0.3.1/tests/conversions-user-dictionary.json
+@@ -29,12 +29,12 @@
+         "segments": "",
+         "segments_size": 0,
+         "segments_cursor_pos": -1,
+-        "output": "わたしの名前はなかのです"
++        "output": "渡しの名前はなかのです"
+     },
+     {
+         "keys": "w a t a s h i n o n a m a e h a n a k a n o d e s u SPC",
+         "input": "わたしのなまえはなかのです",
+-        "segments": "わたしの名前はなかのです",
++        "segments": "渡しの名前はなかのです",
+         "segments_size": 2,
+         "segments_cursor_pos": 0,
+         "output": ""
+@@ -42,7 +42,7 @@
+     {
+         "keys": "w a t a s h i n o n a m a e h a n a k a n o d e s u SPC Right SPC Right Right SPC",
+         "input": "わたしのなまえはなかのです",
+-        "segments": "わたしのなまえはなかのです",
++        "segments": "渡しのなまえはなかのです",
+         "segments_size": 2,
+         "segments_cursor_pos": 1,
+         "output": ""
+Index: libkkc-0.3.1/tests/template.vala
+===================================================================
+--- libkkc-0.3.1.orig/tests/template.vala
++++ libkkc-0.3.1/tests/template.vala
+@@ -16,7 +16,7 @@ class TemplateTests : Kkc.TestCase {
+         assert (source == "source");
+         assert (!okuri);
+ 
+-        template = new Kkc.OkuriganaTemplate ("かう");
++        template = new Kkc.OkuriganaTemplate ("かう", 1);
+         template.get ("source", out source,
+                       "okuri", out okuri);
+ 

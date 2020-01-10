@@ -2,7 +2,7 @@
 
 Name:		libkkc
 Version:	0.3.1
-Release:	5%{?dist}
+Release:	8%{?dist}
 Summary:	Japanese Kana Kanji conversion library
 
 License:	GPLv3+
@@ -10,9 +10,14 @@ Group:		System Environment/Libraries
 URL:		https://bitbucket.org/libkkc
 Source0:	https://bitbucket.org/libkkc/libkkc/downloads/%{name}-%{version}.tar.gz
 Source1:	https://bitbucket.org/libkkc/libkkc-data/downloads/%{name}-data-%{dataversion}.tar.xz
-#Patch0:		libkkc-HEAD.patch
-Patch1:			libkkc-escape.patch
-Patch2:			libkkc-preedit.patch
+#Patch0:	libkkc-HEAD.patch
+Patch1:		libkkc-escape.patch
+Patch2:		libkkc-preedit.patch
+Patch3:		libkkc-nicola-timeout.patch
+Patch4:		libkkc-level3.patch
+Patch5:		libkkc-annotation.patch
+Patch6:		libkkc-vala026.patch
+Patch7:		libkkc-okurigana.patch
 
 BuildRequires:	marisa-devel
 BuildRequires:	vala
@@ -78,6 +83,11 @@ uses at run time.
 #patch0 -p1 -b .HEAD
 %patch1 -p1 -b .escape
 %patch2 -p1 -b .preedit
+%patch3 -p1 -b .nicola-timeout
+%patch4 -p1 -b .level3
+%patch5 -p1 -b .annotation
+%patch6 -p1 -b .vala026
+%patch7 -p1 -b .okurigana
 rm libkkc/*vala.stamp
 
 
@@ -133,6 +143,19 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Mon Jun 08 2015 Scientific Linux Auto Patch Process <SCIENTIFIC-LINUX-DEVEL@LISTSERV.FNAL.GOV>
+- Eliminated rpmbuild "bogus date" error due to inconsistent weekday,
+  by assuming the date is correct and changing the weekday.
+
+* Thu May 28 2015 Daiki Ueno <dueno@redhat.com> - 0.3.1-8
+- work around TPS error due to older valac (Closes: #1225413)
+
+* Fri May 15 2015 Daiki Ueno <dueno@redhat.com> - 0.3.1-7
+- backport conversion improvements (Closes: #1213734)
+
+* Tue Sep  2 2014 Daiki Ueno <dueno@redhat.com> - 0.3.1-6
+- add libkkc-nicola-timeout.patch (Closes: #1131281)
+
 * Thu Aug  7 2014 Daiki Ueno <dueno@redhat.com> - 0.3.1-5
 - add libkkc-preedit.patch (Closes: #1120071)
 

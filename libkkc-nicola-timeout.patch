@@ -1,0 +1,40 @@
+From a64c30a612f2f94d56eefada60e6f3c61ad6dc6d Mon Sep 17 00:00:00 2001
+From: Daiki Ueno <ueno@unixuser.org>
+Date: Thu, 5 Dec 2013 13:30:02 +0900
+Subject: [PATCH] nicola: clear timeout_id when timeout has expired
+
+Patch provided by Mitsuya Shibata at
+https://bitbucket.org/libkkc/libkkc/issue/4/
+---
+ libkkc/nicola.vala | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/libkkc/nicola.vala b/libkkc/nicola.vala
+index a236d3f..918cfc9 100644
+--- a/libkkc/nicola.vala
++++ b/libkkc/nicola.vala
+@@ -208,6 +208,8 @@ namespace Kkc {
+             return null;
+         }
+ 
++        uint timeout_id = 0;
++
+         bool timeout_func () {
+             int64 time = get_time_func ();
+             var r = dispatch (time);
+@@ -215,11 +217,10 @@ namespace Kkc {
+                 var output = decompose_shifted (r);
+                 forwarded (output);
+             }
++            timeout_id = 0;
+             return false;
+         }
+ 
+-        uint timeout_id = 0;
+-
+         // Translate left/right shift modifiers to a normal key
+         // press events, so that they can be mapped in rom-kana
+         // rule.  For example, (lshift a) key event will be two
+-- 
+1.9.3
+

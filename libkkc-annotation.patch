@@ -1,0 +1,68 @@
+From 1debd7ae4719999b2b11315af2ba50ac2b93d70e Mon Sep 17 00:00:00 2001
+From: Daiki Ueno <ueno@unixuser.org>
+Date: Wed, 17 Sep 2014 16:57:31 +0900
+Subject: [PATCH] Copy annotation when adding candidate to candidate-list
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1136421
+---
+ libkkc/candidate-list.vala | 14 ++++++++++----
+ tests/context.vala         | 11 +++++++++++
+ 2 files changed, 21 insertions(+), 4 deletions(-)
+
+Index: libkkc-0.3.1/libkkc/candidate-list.vala
+===================================================================
+--- libkkc-0.3.1.orig/libkkc/candidate-list.vala
++++ libkkc-0.3.1/libkkc/candidate-list.vala
+@@ -63,7 +63,7 @@ namespace Kkc {
+             }
+         }
+ 
+-        Set<string> seen = new HashSet<string> ();
++        Map<string, Candidate> seen = new Gee.HashMap<string, Candidate> ();
+ 
+         internal void clear () {
+             bool is_populated = false;
+@@ -94,12 +94,18 @@ namespace Kkc {
+         }
+ 
+         internal bool add (Candidate candidate) {
+-            if (!(candidate.output in seen)) {
++            if (candidate.output in seen) {
++                var c = seen.get (candidate.output);
++                // If the given candidate has annotation and the
++                // existing one doesn't, copy it.
++                if (c.annotation == null && candidate.annotation != null)
++                    c.annotation = candidate.annotation;
++                return false;
++            } else {
+                 _candidates.add (candidate);
+-                seen.add (candidate.output);
++                seen.set (candidate.output, candidate);
+                 return true;
+             }
+-            return false;
+         }
+ 
+         internal bool add_all (CandidateList other) {
+Index: libkkc-0.3.1/tests/context.vala
+===================================================================
+--- libkkc-0.3.1.orig/tests/context.vala
++++ libkkc-0.3.1/tests/context.vala
+@@ -140,6 +140,17 @@ class ContextTests : Kkc.TestCase {
+         context.clear_output ();
+ 
+         try {
++            context.process_key_events ("a i SPC RET a i SPC SPC");
++        } catch (Kkc.KeyEventFormatError e) {
++            assert_not_reached ();
++        }
++        assert (context.candidates.size > 0);
++        assert (context.candidates.get (0).output == "愛");
++        assert (context.candidates.get (0).annotation == "a");
++        context.reset ();
++        context.clear_output ();
++
++        try {
+             context.process_key_events ("k C-g");
+         } catch (Kkc.KeyEventFormatError e) {
+             assert_not_reached ();

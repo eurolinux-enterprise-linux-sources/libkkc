@@ -1,0 +1,32 @@
+From 5c403135677edc6e8ba1641f373212b25e6630df Mon Sep 17 00:00:00 2001
+From: Daiki Ueno <ueno@unixuser.org>
+Date: Wed, 3 Sep 2014 17:31:54 +0900
+Subject: [PATCH] key-event: clear level3 shift modifiers
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1136722
+---
+ libkkc/key-event.vala | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/libkkc/key-event.vala b/libkkc/key-event.vala
+index 71ff3be..0baa85c 100644
+--- a/libkkc/key-event.vala
++++ b/libkkc/key-event.vala
+@@ -222,10 +222,11 @@ namespace Kkc {
+             name = KeyEventUtils.keyval_name (keyval);
+             unicode = KeyEventUtils.keyval_unicode (keyval);
+ 
+-            // Clear shift modifier when code is ASCII and not SPC.
+-            // FIXME: check the keymap if the key has level 2
++            // Clear shift modifiers when code is ASCII and not SPC.
++            // FIXME: check the keymap if the key has multiple levels
+             if (0x21 <= keyval && keyval < 0x7F)
+-                modifiers &= ~ModifierType.SHIFT_MASK;
++                modifiers &= ~(ModifierType.SHIFT_MASK |
++                               ModifierType.MOD5_MASK);
+             this.keyval = keyval;
+             this.keycode = keycode;
+             this.modifiers = modifiers; 
+-- 
+2.1.0
+

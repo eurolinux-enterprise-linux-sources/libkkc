@@ -1,0 +1,70 @@
+From 7517eefaa05738d556680029fbfd10980c7a6ebc Mon Sep 17 00:00:00 2001
+From: Daiki Ueno <ueno@gnu.org>
+Date: Fri, 19 Dec 2014 13:19:33 +0900
+Subject: [PATCH] rom-kana: Fix compilation error with Vala 0.26.0.83-ed603
+
+---
+ libkkc/rom-kana.vala | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
+
+Index: libkkc-0.3.1/libkkc/rom-kana.vala
+===================================================================
+--- libkkc-0.3.1.orig/libkkc/rom-kana.vala
++++ libkkc-0.3.1/libkkc/rom-kana.vala
+@@ -426,16 +426,17 @@ namespace Kkc {
+          * @return `true` if there is partial output, `false` otherwise
+          */
+         public bool flush_partial () {
+-            string output;
+-            if (current_node.entry != null &&
+-                (output = current_node.entry.get_kana (kana_mode, true)).length > 0) {
+-                _produced.add (RomKanaCharacter () {
+-                        output = output, input = _pending_input.str
+-                    });
+-                _pending_input.erase ();
+-                _pending_output.erase ();
+-                current_node = rule.root_node;
+-                return true;
++            if (current_node.entry != null) {
++                string output = current_node.entry.get_kana (kana_mode, true);
++                if (output.length > 0) {
++                    _produced.add (RomKanaCharacter () {
++                            output = output, input = _pending_input.str
++                        });
++                    _pending_input.erase ();
++                    _pending_output.erase ();
++                    current_node = rule.root_node;
++                    return true;
++                }
+             }
+ 
+             if (!auto_correct &&
+Index: libkkc-0.3.1/libkkc/key-event.vala
+===================================================================
+--- libkkc-0.3.1.orig/libkkc/key-event.vala
++++ libkkc-0.3.1/libkkc/key-event.vala
+@@ -188,7 +188,9 @@ namespace Kkc {
+                     elements.add ("release");
+                 }
+                 elements.add (_base);
++#if !VALA_0_24
+                 elements.add (null); // make sure that strv ends with null
++#endif
+                 return "(" + string.joinv (" ", elements.to_array ()) + ")";
+             } else {
+                 return _base;
+Index: libkkc-0.3.1/libkkc/user-sentence-dictionary.vala
+===================================================================
+--- libkkc-0.3.1.orig/libkkc/user-sentence-dictionary.vala
++++ libkkc-0.3.1/libkkc/user-sentence-dictionary.vala
+@@ -252,8 +252,10 @@ namespace Kkc {
+             if (offset < 3)
+                 return false;
+ 
++#if !VALA_0_24
+             // Make sure to null terminate so joinv determine the end of strv.
+             input.add (null);
++#endif
+             constraint_entries.set (string.joinv ("", input.to_array ()),
+                                     constraint);
+             phrase_entries.set (string.joinv (" ", input.to_array ()),
