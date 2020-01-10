@@ -2,7 +2,7 @@
 
 Name:		libkkc
 Version:	0.3.1
-Release:	8%{?dist}
+Release:	9%{?dist}
 Summary:	Japanese Kana Kanji conversion library
 
 License:	GPLv3+
@@ -18,6 +18,7 @@ Patch4:		libkkc-level3.patch
 Patch5:		libkkc-annotation.patch
 Patch6:		libkkc-vala026.patch
 Patch7:		libkkc-okurigana.patch
+Patch8:		libkkc-cursor-movement.patch
 
 BuildRequires:	marisa-devel
 BuildRequires:	vala
@@ -88,6 +89,7 @@ uses at run time.
 %patch5 -p1 -b .annotation
 %patch6 -p1 -b .vala026
 %patch7 -p1 -b .okurigana
+%patch8 -p1 -b .cursor-movement
 rm libkkc/*vala.stamp
 
 
@@ -143,9 +145,8 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
-* Mon Jun 08 2015 Scientific Linux Auto Patch Process <SCIENTIFIC-LINUX-DEVEL@LISTSERV.FNAL.GOV>
-- Eliminated rpmbuild "bogus date" error due to inconsistent weekday,
-  by assuming the date is correct and changing the weekday.
+* Mon Mar 28 2016 Daiki Ueno <dueno@redhat.com> - 0.3.1-9
+- add libkkc-cursor-movement.patch (Closes: #1261434)
 
 * Thu May 28 2015 Daiki Ueno <dueno@redhat.com> - 0.3.1-8
 - work around TPS error due to older valac (Closes: #1225413)
