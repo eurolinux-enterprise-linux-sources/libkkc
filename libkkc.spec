@@ -2,7 +2,7 @@
 
 Name:		libkkc
 Version:	0.3.1
-Release:	1%{?dist}
+Release:	4%{?dist}
 Summary:	Japanese Kana Kanji conversion library
 
 License:	GPLv3+
@@ -11,6 +11,7 @@ URL:		https://bitbucket.org/libkkc
 Source0:	https://bitbucket.org/libkkc/libkkc/downloads/%{name}-%{version}.tar.gz
 Source1:	https://bitbucket.org/libkkc/libkkc-data/downloads/%{name}-data-%{dataversion}.tar.xz
 #Patch0:		libkkc-HEAD.patch
+Patch1:			libkkc-escape.patch
 
 BuildRequires:	marisa-devel
 BuildRequires:	vala
@@ -74,6 +75,8 @@ uses at run time.
 %prep
 %setup -q
 #patch0 -p1 -b .HEAD
+%patch1 -p1 -b .escape
+rm libkkc/*vala.stamp
 
 
 %build
@@ -128,6 +131,15 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Wed Feb 12 2014 Daiki Ueno <dueno@redhat.com> - 0.3.1-4
+- add libkkc-escape.patch (Closes: #1064088)
+
+* Fri Jan 24 2014 Daniel Mach <dmach@redhat.com> - 0.3.1-3
+- Mass rebuild 2014-01-24
+
+* Fri Dec 27 2013 Daniel Mach <dmach@redhat.com> - 0.3.1-2
+- Mass rebuild 2013-12-27
+
 * Sun Sep 15 2013 Daiki Ueno <dueno@redhat.com> - 0.3.1-1
 - new upstreamm release
 - fix numeric conversion

@@ -1,0 +1,107 @@
+From a1de975546de4c6f3d92284d1de052fb11776168 Mon Sep 17 00:00:00 2001
+From: Daiki Ueno <ueno@unixuser.org>
+Date: Mon, 9 Dec 2013 18:54:44 +0900
+Subject: [PATCH] user-dict: escape special characters in midasi string
+
+Suggested by Akihiro TSUKADA <tskd2@yahoo.co.jp> in:
+<http://du-a.org/pipermail/libkkc-list/2013-December/000027.html>.
+---
+ libkkc/dictionary.vala              |  2 ++
+ libkkc/user-segment-dictionary.vala | 10 +++++-----
+ tests/user-dictionary.vala          | 17 ++++++++++++++++-
+ tests/user-segment-dictionary-good  |  1 +
+ 4 files changed, 24 insertions(+), 6 deletions(-)
+
+diff --git a/libkkc/dictionary.vala b/libkkc/dictionary.vala
+index 30eabb7..5e3cd58 100644
+--- a/libkkc/dictionary.vala
++++ b/libkkc/dictionary.vala
+@@ -70,6 +70,8 @@ namespace Kkc {
+                 switch (uc) {
+                 case '\\':
+                 case '/':
++                case ' ':
++                case '\t':
+                 case '\n':
+                     builder.append ("\\x%02x".printf (uc));
+                     break;
+diff --git a/libkkc/user-segment-dictionary.vala b/libkkc/user-segment-dictionary.vala
+index 7bd72fa..25e1ec2 100644
+--- a/libkkc/user-segment-dictionary.vala
++++ b/libkkc/user-segment-dictionary.vala
+@@ -63,15 +63,15 @@ namespace Kkc {
+                     okuri = false;
+                     continue;
+                 }
+-                int index = line.index_of ("/");
+-                if (index < 1) {
++                string[] strv = line.strip ().split_set (" \t", 2);
++                if (strv.length < 2) {
+                     throw new DictionaryError.MALFORMED_INPUT (
+                         "can't extract midasi from line %s",
+                         line);
+                 }
+ 
+-                string midasi = line[0:index].strip ();
+-                string candidates_str = line[index:line.length];
++                string midasi = DictionaryUtils.unescape (strv[0]);
++                string candidates_str = strv[1];
+                 if (!candidates_str.has_prefix ("/") ||
+                     !candidates_str.has_suffix ("/")) {
+                     throw new DictionaryError.MALFORMED_INPUT (
+@@ -125,7 +125,7 @@ namespace Kkc {
+             while (iter.next ()) {
+                 var entry = iter.get ();
+                 var line = "%s %s\n".printf (
+-                    entry.key,
++                    DictionaryUtils.escape (entry.key),
+                     DictionaryUtils.join_candidates (entry.value.to_array ()));
+                 builder.append (line);
+             }
+diff --git a/tests/user-dictionary.vala b/tests/user-dictionary.vala
+index 460db23..f6a7566 100644
+--- a/tests/user-dictionary.vala
++++ b/tests/user-dictionary.vala
+@@ -53,7 +53,9 @@ class UserSegmentDictionaryTests : Kkc.TestCase {
+         dictionary.select_candidate (
+             new Kkc.Candidate ("あお", false, "青"));
+         dictionary.select_candidate (
+-            new Kkc.Candidate ("あ お", false, "青"));
++            new Kkc.Candidate ("あ お", false, "青 "));
++        dictionary.select_candidate (
++            new Kkc.Candidate ("あ/お", false, "青/"));
+         dictionary.select_candidate (
+             new Kkc.Candidate ("あu", true, "会u"));
+         dictionary.select_candidate (
+@@ -64,6 +66,19 @@ class UserSegmentDictionaryTests : Kkc.TestCase {
+         dictionary.purge_candidate (candidate);
+ 
+         dictionary.save ();
++
++        try {
++            dictionary = new Kkc.UserSegmentDictionary (
++                "test-user-segment-dictionary");
++        } catch (Error e) {
++            assert_not_reached ();
++        }
++
++        Kkc.Candidate[] candidates;
++        dictionary.lookup_candidates ("あ お", false, out candidates);
++        assert (candidates.length == 1 && candidates[0].output == "青 ");
++        dictionary.lookup_candidates ("あ/お", false, out candidates);
++        assert (candidates.length == 1 && candidates[0].output == "青/");
+     }
+ 
+     public override void set_up () {
+diff --git a/tests/user-segment-dictionary-good b/tests/user-segment-dictionary-good
+index 184b6ef..05adf4e 100644
+--- a/tests/user-segment-dictionary-good
++++ b/tests/user-segment-dictionary-good
+@@ -2,3 +2,4 @@
+ ;; okuri-nasi entries.
+ #あん /#3案/
+ あああ /亜ああ/
++/ /\x2f/\x2f/
+-- 
+1.8.4.2
+
