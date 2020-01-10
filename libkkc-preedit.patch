@@ -1,0 +1,243 @@
+diff --git a/data/rules/default/keymap/default.json b/data/rules/default/keymap/default.json
+index fe459b0..52f8580 100644
+--- a/data/rules/default/keymap/default.json
++++ b/data/rules/default/keymap/default.json
+@@ -24,6 +24,8 @@
+             "Right": "next-segment",
+             "Left": "previous-segment",
+             "C-f": "next-segment",
++            "Home": "first-segment",
++            "End": "last-segment",
+             "C-Right": "expand-segment",
+             "C-Left": "shrink-segment",
+             "S-Right": "expand-segment",
+diff --git a/data/rules/default/rom-kana/default.json b/data/rules/default/rom-kana/default.json
+index 76a39a4..742e43d 100644
+--- a/data/rules/default/rom-kana/default.json
++++ b/data/rules/default/rom-kana/default.json
+@@ -97,6 +97,11 @@
+             "lu": ["", "ぅ"],
+             "le": ["", "ぇ"],
+             "lo": ["", "ぉ"],
++            "lya": ["", "ゃ"],
++            "lyi": ["", "ぃ"],
++            "lyu": ["", "ゅ"],
++            "lye": ["", "ぇ"],
++            "lyo": ["", "ょ"],
+             "kya": ["", "きゃ" ],
+             "kye": ["", "きぇ" ],
+             "kyi": ["", "きぃ" ],
+diff --git a/libkkc/convert-segment-state-handler.vala b/libkkc/convert-segment-state-handler.vala
+index 43b74bf..14c8dbc 100644
+--- a/libkkc/convert-segment-state-handler.vala
++++ b/libkkc/convert-segment-state-handler.vala
+@@ -32,6 +32,10 @@ namespace Kkc {
+                                        do_select_unhandled);
+             register_command_callback ("previous-segment",
+                                        do_select_unhandled);
++            register_command_callback ("first-segment",
++                                       do_select_unhandled);
++            register_command_callback ("last-segment",
++                                       do_select_unhandled);
+             register_command_callback ("delete",
+                                        do_clear_unhandled);
+             register_command_callback ("original-candidate",
+diff --git a/libkkc/convert-sentence-state-handler.vala b/libkkc/convert-sentence-state-handler.vala
+index 6f83dc1..e0f118f 100644
+--- a/libkkc/convert-sentence-state-handler.vala
++++ b/libkkc/convert-sentence-state-handler.vala
+@@ -50,6 +50,10 @@ namespace Kkc {
+                                        do_next_segment);
+             register_command_callback ("previous-segment",
+                                        do_previous_segment);
++            register_command_callback ("first-segment",
++                                       do_first_segment);
++            register_command_callback ("last-segment",
++                                       do_last_segment);
+ 
+             register_command_callback ("abort", do_clear_unhandled);
+             register_command_callback ("delete", do_clear_unhandled);
+@@ -95,6 +99,16 @@ namespace Kkc {
+             return true;
+         }
+ 
++        bool do_first_segment (string? command, State state, KeyEvent key) {
++            state.segments.first_segment ();
++            return true;
++        }
++
++        bool do_last_segment (string? command, State state, KeyEvent key) {
++            state.segments.last_segment ();
++            return true;
++        }
++
+         bool do_start_segment_conversion (string? command, State state, KeyEvent key) {
+             state.lookup (state.segments[state.segments.cursor_pos]);
+             state.candidates.first ();
+@@ -113,7 +127,10 @@ namespace Kkc {
+             state.select_sentence ();
+             state.reset ();
+ 
+-            if (command == "commit")
++            if (command == "commit" ||
++                // Consider non-printable key as commit command
++                // FIXME: Make this check more reliable
++                (command == null && key.unicode == '\0'))
+                 return true;
+ 
+             if (command == null &&
+diff --git a/libkkc/initial-state-handler.vala b/libkkc/initial-state-handler.vala
+index 6d1dfb7..0080c4b 100644
+--- a/libkkc/initial-state-handler.vala
++++ b/libkkc/initial-state-handler.vala
+@@ -57,6 +57,8 @@ namespace Kkc {
+             register_command_callback ("next-candidate", do_next_candidate);
+             register_command_callback ("next-segment", do_next_character);
+             register_command_callback ("previous-segment", do_previous_character);
++            register_command_callback ("first-segment", do_first_character);
++            register_command_callback ("last-segment", do_last_character);
+             register_command_callback ("quote", do_quote);
+             register_command_callback ("register", do_register);
+ 
+@@ -208,6 +210,24 @@ namespace Kkc {
+             return true;
+         }
+ 
++        bool do_first_character (string? command, State state, KeyEvent key) {
++            state.finish_input_editing ();
++            if (state.input_characters.size == 0)
++                return false;
++
++            state.input_characters_cursor_pos = 0;
++            return true;
++        }
++
++        bool do_last_character (string? command, State state, KeyEvent key) {
++            state.finish_input_editing ();
++            if (state.input_characters.size == 0)
++                return false;
++
++            state.input_characters_cursor_pos = state.input_characters.size - 1;
++            return true;
++        }
++
+         bool do_ (string? command, State state, KeyEvent key) {
+             bool retval = false;
+ 
+diff --git a/libkkc/keymap.vala b/libkkc/keymap.vala
+index 4c4f300..b369843 100644
+--- a/libkkc/keymap.vala
++++ b/libkkc/keymap.vala
+@@ -34,6 +34,8 @@ namespace Kkc {
+     public class Keymap : Object {
+         static const KeymapCommandEntry Commands[] = {
+             { "abort", N_("Abort") },
++            { "first-segment", N_("First Segment") },
++            { "last-segment", N_("Last Segment") },
+             { "commit", N_("Commit") },
+             { "complete", N_("Complete") },
+             { "delete", N_("Delete") },
+diff --git a/libkkc/rom-kana.vala b/libkkc/rom-kana.vala
+index 75e927a..cd6447e 100644
+--- a/libkkc/rom-kana.vala
++++ b/libkkc/rom-kana.vala
+@@ -438,10 +438,18 @@ namespace Kkc {
+                 return true;
+             }
+ 
+-            if (!auto_correct && _pending_output.len > 0) {
+-                _produced.add (RomKanaCharacter () {
+-                        output = _pending_output.str, input = _pending_input.str
++            if (!auto_correct &&
++                (_pending_output.len > 0 || _pending_input.len > 0)) {
++                if (_pending_output.len > 0)
++                    _produced.add (RomKanaCharacter () {
++                            output = _pending_output.str, input = _pending_input.str
+                         });
++                else if (_pending_input.len > 0)
++                    for (var i = 0; i < _pending_input.len; i++)
++                        _produced.add (RomKanaCharacter () {
++                                output = _pending_input.str[i].to_string (),
++                                    input = _pending_input.str[i].to_string ()
++                            });
+                 _pending_input.erase ();
+                 _pending_output.erase ();
+                 current_node = rule.root_node;
+diff --git a/libkkc/segment-list.vala b/libkkc/segment-list.vala
+index 1abb069..b5a57ea 100644
+--- a/libkkc/segment-list.vala
++++ b/libkkc/segment-list.vala
+@@ -84,6 +84,14 @@ namespace Kkc {
+             return false;
+         }
+ 
++        public bool last_segment () {
++            if (segments.size > 0) {
++                cursor_pos = segments.size - 1;
++                return true;
++            }
++            return false;
++        }
++
+         public void next_segment () {
+             if (cursor_pos == -1)
+                 return;
+diff --git a/tests/context.vala b/tests/context.vala
+index a3fec0b..3f12179 100644
+--- a/tests/context.vala
++++ b/tests/context.vala
+@@ -148,9 +148,27 @@ class ContextTests : Kkc.TestCase {
+         context.clear_output ();
+ 
+         try {
++            context.process_key_events ("a a a");
++            assert (context.process_key_events ("Left"));
++            assert (context.input_cursor_pos == 2);
++            assert (context.process_key_events ("Right"));
++            assert (context.input_cursor_pos == -1);
++            assert (context.process_key_events ("Home"));
++            assert (context.input_cursor_pos == 0);
++            assert (context.process_key_events ("End"));
++            assert (context.input_cursor_pos == 2);
++        } catch (Kkc.KeyEventFormatError e) {
++            assert_not_reached ();
++        }
++        context.reset ();
++        context.clear_output ();
++
++        try {
+             context.process_key_events ("a a a RET");
+             assert (!context.process_key_events ("Left"));
+             assert (!context.process_key_events ("Right"));
++            assert (!context.process_key_events ("Home"));
++            assert (!context.process_key_events ("End"));
+         } catch (Kkc.KeyEventFormatError e) {
+             assert_not_reached ();
+         }
+diff --git a/tests/conversions-initial.json b/tests/conversions-initial.json
+index 1d7641b..46ac14e 100644
+--- a/tests/conversions-initial.json
++++ b/tests/conversions-initial.json
+@@ -35,5 +35,7 @@
+   { "keys": "a i u e o Left BackSpace i", "input": "あいういお", "output": "" },
+   { "keys": "a i u e o Left BackSpace k", "input": "あいうkお", "output": "" },
+   { "keys": "a i Left Left Left Left BackSpace k", "input": "kあい", "output": "" },
+-  { "keys": "a i K", "input": "あいK", "output": "" }
++  { "keys": "a i K", "input": "あいK", "output": "" },
++  { "keys": "t e s t F10", "auto_correct": false, "input": "test", "output": "" },
++  { "keys": "t e s t F7", "auto_correct": false, "input": "テst", "output": "" }
+ ]
+diff --git a/tests/lib/test-utils.vala b/tests/lib/test-utils.vala
+index 736aa31..aacadc9 100644
+--- a/tests/lib/test-utils.vala
++++ b/tests/lib/test-utils.vala
+@@ -69,6 +69,9 @@ namespace Kkc.TestUtils {
+             var node = array.get_element (i);
+             assert (node.get_node_type () == Json.NodeType.OBJECT);
+             var object = node.get_object ();
++            if (object.has_member ("auto_correct"))
++                context.auto_correct =
++                    object.get_boolean_member ("auto_correct");
+             assert (object.has_member ("keys"));
+             var keys = object.get_string_member ("keys");
+             try {
